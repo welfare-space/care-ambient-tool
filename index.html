@@ -270,8 +270,8 @@
     // --- 以下、音声認識とUIの補助的ロジック（変更なし） ---
     recognition.onresult = (event) => {
         let interimTranscript = '';
-        finalTranscript = '';
-        for (let i = 0; i < event.results.length; ++i) {
+        // finalTranscript は onend で確定させるため、ここではクリアしない
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
             if (event.results[i].isFinal) {
                 finalTranscript += event.results[i][0].transcript;
             } else {
@@ -281,27 +281,38 @@
         transcriptOutput.value = finalTranscript + interimTranscript;
     };
 
-    // --- 【修正箇所】音声認識の終了イベントを追加 ---
+    // --- 【重要】ここが完了処理のメインになります ---
     recognition.onend = () => {
-        if (isTranscribing) {
-            isTranscribing = false;
-            statusText.textContent = '文字起こしが完了しました。';
-            loader.classList.add('hidden');
-            transcriptOutput.value = finalTranscript; // 最終テキストをセット
-            if (transcriptOutput.value.trim()){
-                copyButton.disabled = false;
-                nextStepButton.disabled = false;
-                saveButton.disabled = false;
-            }
+        console.log("Recognition ended.");
+        isTranscribing = false;
+        statusText.textContent = '文字起こしが完了しました。';
+        loader.classList.add('hidden');
+        
+        // 最終的なテキストを確定
+        transcriptOutput.value = finalTranscript; 
+
+        // テキストがあればボタンを有効化
+        if (transcriptOutput.value.trim()){
+            copyButton.disabled = false;
+            nextStepButton.disabled = false;
+            saveButton.disabled = false;
+        } else {
+            // 何も文字起こしされなかった場合
+            transcriptOutput.placeholder = '音声が認識されませんでした。マイクの許可を確認するか、別の音声ファイルでお試しください。';
         }
     };
 
     audioPlayer.addEventListener('ended', () => {
+        console.log("Audio playback ended.");
         if (isTranscribing) {
             // 音声再生が終了したら、少し待ってから認識を停止させる
+            // これにより、音声の最後の部分が確実に処理される
             setTimeout(() => {
-                if(recognition) recognition.stop();
-            }, 500); // 0.5秒の猶予を持たせる
+                if(recognition && isTranscribing) {
+                    console.log("Stopping recognition...");
+                    recognition.stop();
+                }
+            }, 1000); // 1秒の猶予を持たせる
         }
     });
     
@@ -330,6 +341,7 @@
 </script>
 </body>
 </html>
+
 
 
 
